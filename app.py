@@ -4,6 +4,22 @@ import os
 import shutil
 import tempfile
 
+def load_env_file():
+    """Load environment variables from .env file"""
+    env_path = os.path.join(os.path.dirname(__file__), '.env')
+    if os.path.exists(env_path):
+        with open(env_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    key = key.strip()
+                    value = value.strip().strip('"\'')
+                    os.environ[key] = value
+
+# Load environment variables from .env file
+load_env_file()
+
 # Suppress ctranslate2 pkg_resources deprecation warning during import
 warnings.filterwarnings(
     "ignore",
@@ -228,12 +244,12 @@ if st.button("Summarize"):
             st.text_area("Full transcript", transcript, height=200)
             st.download_button("Download Transcript", transcript, file_name="transcript.txt")
 
-            with st.expander("Show timed segments"):
-                try:
-                    import pandas as pd
-                    st.dataframe(pd.DataFrame(segments))
-                except Exception:
-                    st.write(segments)
+            # with st.expander("Show timed segments"):
+            #     try:
+            #         import pandas as pd
+            #         st.dataframe(pd.DataFrame(segments))
+            #     except Exception:
+            #         st.write(segments)
 
             with st.spinner("✨ Summarizing with Gemini AI..."):
                 summary = summarize_text(transcript)
