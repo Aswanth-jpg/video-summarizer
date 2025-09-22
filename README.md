@@ -28,8 +28,8 @@ An intelligent YouTube video summarizer that automatically downloads, transcribe
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/Aswanth-jpg/AI-YT-bot.git
-cd AI-YT-bot
+git clone https://github.com/Aswanth-jpg/video-summarizer.git
+cd video-summarizer
 ```
 
 ### 2. Create Virtual Environment
