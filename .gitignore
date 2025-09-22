@@ -77,8 +77,8 @@ streamlit.out
 *.bin
 *.safetensors
 
-# FFmpeg (if you want to exclude the zip)
-# ffmpeg/
+# FFmpeg (excluding installation files)
+ffmpeg/
 
 # Test files (optional - keep if you want to run tests)
 # test_*.py
