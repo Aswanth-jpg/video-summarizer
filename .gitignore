@@ -1,10 +1,3 @@
-# Environment Variables (CRITICAL - Contains API Keys!)
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
 # Python
 __pycache__/
 *.py[cod]
@@ -23,8 +16,6 @@ parts/
 sdist/
 var/
 wheels/
-pip-wheel-metadata/
-share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
@@ -36,48 +27,33 @@ env/
 ENV/
 env.bak/
 venv.bak/
-.venv/
 
-# Streamlit
-.streamlit/
-streamlit.out
+# Environment Variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
-# Audio/Video Files (usually large and temporary)
-*.mp3
-*.mp4
-*.wav
-*.avi
-*.mov
-*.mkv
-*.webm
-AUDIO.mp3
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
 
-# Model Files (can be large)
-*.pt
-*.pth
-*.onnx
-*.bin
-base.pt
+# Build outputs
+frontend/dist/
+frontend/build/
 
-# FFmpeg binaries (large files)
-ffmpeg/
-ffmpeg.exe
-ffprobe.exe
-
-# Temporary files
-temp/
-tmp/
-*.tmp
-*.temp
-
-# IDE/Editor files
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# OS generated files
+# OS
 .DS_Store
 .DS_Store?
 ._*
@@ -85,30 +61,24 @@ tmp/
 .Trashes
 ehthumbs.db
 Thumbs.db
-desktop.ini
 
 # Logs
 *.log
 logs/
 
-# Jupyter Notebook
-.ipynb_checkpoints
+# Temporary files
+*.tmp
+*.temp
+streamlit.out
 
-# pytest
-.pytest_cache/
-.coverage
-htmlcov/
+# AI Model files
+*.pt
+*.pth
+*.bin
+*.safetensors
 
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
+# FFmpeg (if you want to exclude the zip)
+# ffmpeg/
 
-# Backup files
-*_backup.py
-*.bak
-*.backup
-
-# Cache directories
-.cache/
-cache/
+# Test files (optional - keep if you want to run tests)
+# test_*.py

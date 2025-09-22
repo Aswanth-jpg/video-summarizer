@@ -1,0 +1,10 @@
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+yt-dlp>=2024.1.0
+faster-whisper>=1.2.0
+ctranslate2>=4.6.0
+google-generativeai>=0.8.0
+python-dotenv>=1.0.0
+# Pin setuptools to avoid pkg_resources deprecation warnings
+setuptools<81
