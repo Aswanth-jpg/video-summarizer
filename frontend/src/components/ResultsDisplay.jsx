@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
-import { FaDownload, FaCopy, FaCheck, FaChevronDown, FaChevronUp } from 'react-icons/fa';
+import { FaDownload, FaCopy, FaCheck } from 'react-icons/fa';
 
 const ResultsDisplay = ({ results, onDownloadTranscript, onDownloadSummary }) => {
   const [copiedTranscript, setCopiedTranscript] = useState(false);
   const [copiedSummary, setCopiedSummary] = useState(false);
-  const [showSegments, setShowSegments] = useState(false);
 
   const copyToClipboard = async (text, setCopied) => {
     try {
@@ -23,7 +22,7 @@ const ResultsDisplay = ({ results, onDownloadTranscript, onDownloadSummary }) =>
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const { transcript, summary, metadata, segments } = results;
+  const { transcript, summary, metadata } = results;
 
   return (
     <div className="results-display">
@@ -99,36 +98,6 @@ const ResultsDisplay = ({ results, onDownloadTranscript, onDownloadSummary }) =>
           />
         </div>
       </div>
-
-      {/* Segments Section (Optional) */}
-      {segments && segments.length > 0 && (
-        <div className="result-section">
-          <div className="section-header">
-            <h3>⏱️ Timed Segments</h3>
-            <button
-              onClick={() => setShowSegments(!showSegments)}
-              className="action-btn"
-              title="Toggle segments view"
-            >
-              {showSegments ? <FaChevronUp /> : <FaChevronDown />}
-            </button>
-          </div>
-          {showSegments && (
-            <div className="content-box">
-              <div className="segments-list">
-                {segments.map((segment, index) => (
-                  <div key={index} className="segment-item">
-                    <div className="segment-time">
-                      {formatTime(segment.start)} - {formatTime(segment.end)}
-                    </div>
-                    <div className="segment-text">{segment.text}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 };

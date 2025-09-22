@@ -5,5 +5,5 @@ if torch.cuda.is_available():
 model_path = "base.pt"
 audio_path = "audio.mp3"
 model = whisper.load_model(model_path)
-result = model.transcribe(audio_path, fp16=False, word_timestamps=True)
+result = model.transcribe(audio_path, fp16=False)
 print(result["text"])

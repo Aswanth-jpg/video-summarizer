@@ -66,7 +66,6 @@ class TranscriptResponse(BaseModel):
     transcript: str
     summary: str
     metadata: Dict[str, Any]
-    segments: List[Dict[str, Any]]
 
 # Load Whisper model on startup
 @app.on_event("startup")
@@ -142,15 +141,9 @@ def transcribe_audio(audio_file: str):
     audio_for_model = maybe_convert_to_wav(audio_file)
     segments, info = whisper_model.transcribe(audio_for_model)
 
-    segment_rows = []
     parts = []
     for seg in segments:
         parts.append(seg.text)
-        segment_rows.append({
-            "start": getattr(seg, "start", None),
-            "end": getattr(seg, "end", None),
-            "text": seg.text,
-        })
 
     transcript = " ".join(parts).strip()
 
@@ -160,7 +153,7 @@ def transcribe_audio(audio_file: str):
         "duration": getattr(info, "duration", None),
     }
 
-    return transcript, segment_rows, meta
+    return transcript, meta
 
 def summarize_text(text: str, api_key: Optional[str] = None, model_name: str = "gemini-1.5-flash") -> str:
     """Summarize text using Google Gemini"""
@@ -223,7 +216,7 @@ async def process_youtube_video(request: YouTubeRequest):
         
         try:
             # Transcribe audio
-            transcript, segments, meta = transcribe_audio(audio_path)
+            transcript, meta = transcribe_audio(audio_path)
             
             # Summarize transcript
             summary = summarize_text(transcript, request.gemini_api_key)
@@ -236,8 +229,7 @@ async def process_youtube_video(request: YouTubeRequest):
             return TranscriptResponse(
                 transcript=transcript,
                 summary=summary,
-                metadata=meta,
-                segments=segments
+                metadata=meta
             )
             
         except Exception as e:

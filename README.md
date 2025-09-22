@@ -2,20 +2,25 @@
 
 An intelligent YouTube video summarizer that automatically downloads, transcribes, and generates AI-powered summaries of YouTube videos using OpenAI's Whisper and Google's Gemini AI.
 
+## 🏗️ Architecture
+
+- **Frontend**: React 18 + Vite with modern responsive design
+- **Backend**: FastAPI with async processing capabilities
+- **AI**: Faster-Whisper + Google Gemini AI
+
 ## 🚀 Features
 
 ### Core Functionality
 - **🎥 YouTube Video Processing**: Download audio from any YouTube video using `yt-dlp`
 - **🗣️ Audio Transcription**: High-quality speech-to-text using OpenAI's Faster Whisper model
 - **🤖 AI-Powered Summarization**: Generate intelligent summaries using Google Gemini AI
-- **📱 Web Interface**: User-friendly Streamlit web application
+- **📱 Modern Web Interface**: User-friendly React application with responsive design
 - **📥 Download Options**: Download both transcripts and summaries as text files
 
 ### Key Capabilities
 - **Multi-format Audio Support**: Handles various audio formats (MP3, M4A, WebM, etc.)
 - **Language Detection**: Automatically detects the language of the video
 - **Duration Awareness**: Warns for long videos and shows processing time estimates
-- **Timed Segments**: Maintains timestamp information for detailed transcript analysis
 - **Error Handling**: Robust error handling with informative messages
 - **API Key Management**: Secure handling of API keys through environment variables or UI input
 
@@ -23,6 +28,7 @@ An intelligent YouTube video summarizer that automatically downloads, transcribe
 
 ### Prerequisites
 - Python 3.8+ (tested with Python 3.13)
+- Node.js 16+ and npm
 - FFmpeg (for audio processing)
 - Google Gemini API key
 
@@ -32,18 +38,21 @@ git clone https://github.com/Aswanth-jpg/video-summarizer.git
 cd video-summarizer
 ```
 
-### 2. Create Virtual Environment
+### 2. Backend Setup
 ```bash
+cd backend
 python -m venv venv
 # On Windows:
 venv\Scripts\activate
 # On Linux/Mac:
 source venv/bin/activate
+pip install -r requirements.txt
 ```
 
-### 3. Install Dependencies
+### 3. Frontend Setup
 ```bash
-pip install -r requirements.txt
+cd frontend
+npm install
 ```
 
 ### 4. Install FFmpeg
@@ -65,19 +74,13 @@ brew install ffmpeg
 ### 5. Configure API Keys
 
 #### Option A: Environment File (Recommended)
-Create a `.env` file in the project root:
+Create a `.env` file in the backend directory:
 ```env
 GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
-#### Option B: Streamlit Secrets
-Create `.streamlit/secrets.toml`:
-```toml
-GEMINI_API_KEY = "your_gemini_api_key_here"
-```
-
-#### Option C: Runtime Input
-Enter your API key directly in the web interface sidebar.
+#### Option B: Runtime Input
+Enter your API key directly in the web interface when processing videos.
 
 ### 6. Get Your Gemini API Key
 1. Visit [Google AI Studio](https://aistudio.google.com/app/apikey)
@@ -88,12 +91,23 @@ Enter your API key directly in the web interface sidebar.
 ## 🎯 Usage
 
 ### Start the Application
+
+#### Backend Server
 ```bash
-streamlit run app.py
+cd backend
+python start_server.py
 ```
+The backend will be available at `http://localhost:8000`
+
+#### Frontend Development Server
+```bash
+cd frontend
+npm run dev
+```
+The frontend will be available at `http://localhost:5173`
 
 ### Using the Web Interface
-1. **Open your browser** to `http://localhost:8501`
+1. **Open your browser** to `http://localhost:5173`
 2. **Configure API key** (if not already set in environment)
 3. **Paste YouTube URL** in the input field
 4. **Click "Summarize"** and wait for processing
@@ -110,16 +124,40 @@ YouTube URL → Audio Download → Whisper Transcription → Gemini Summarizatio
 ## 📁 Project Structure
 
 ```
-AI-YT-bot/
-├── app.py                 # Main Streamlit application
-├── requirements.txt       # Python dependencies
-├── .gitignore            # Git ignore rules
-├── README.md             # This file
-├── test_gemini.py        # Gemini API test script
-├── test_openai.py        # OpenAI API test script
-├── test_whisper.py       # Whisper model test script
-└── test_ytdlp.py         # YouTube download test script
+video-summarizer/
+├── backend/
+│   ├── main.py                # FastAPI application
+│   ├── start_server.py        # Server startup script
+│   └── requirements.txt       # Python dependencies
+├── frontend/
+│   ├── src/
+│   │   ├── components/        # React components
+│   │   │   ├── Header.jsx
+│   │   │   ├── VideoProcessor.jsx
+│   │   │   ├── LoadingSpinner.jsx
+│   │   │   └── ResultsDisplay.jsx
+│   │   ├── App.jsx           # Main React app
+│   │   └── main.jsx          # React entry point
+│   ├── package.json          # Node.js dependencies
+│   └── vite.config.js        # Vite configuration
+├── app.py                    # Legacy Streamlit app
+├── README.md                 # This file
+├── test_gemini.py           # Gemini API test script
+├── test_openai.py           # OpenAI API test script
+├── test_whisper.py          # Whisper model test script
+└── test_ytdlp.py            # YouTube download test script
 ```
+
+## 🌐 API Endpoints
+
+The FastAPI backend provides the following endpoints:
+
+- `GET /` - Welcome message
+- `GET /health` - Health check endpoint
+- `POST /process` - Process YouTube video (main endpoint)
+- `POST /download/transcript` - Download transcript as file
+- `POST /download/summary` - Download summary as file
+- `GET /docs` - Interactive API documentation
 
 ## 🧪 Testing
 
@@ -137,17 +175,29 @@ python test_whisper.py
 
 # Test OpenAI API (if applicable)
 python test_openai.py
+
+# Test backend API
+curl http://localhost:8000/health
 ```
 
 ## 📋 Dependencies
 
+### Backend Dependencies
 | Package | Purpose |
 |---------|---------|
-| `streamlit` | Web interface framework |
+| `fastapi` | Web API framework |
+| `uvicorn` | ASGI server |
 | `yt-dlp` | YouTube video/audio downloader |
 | `faster-whisper` | Speech-to-text transcription |
 | `google-generativeai` | Google Gemini AI integration |
 | `ctranslate2` | Optimized inference engine |
+
+### Frontend Dependencies
+| Package | Purpose |
+|---------|---------|
+| `react` | UI framework |
+| `vite` | Build tool and dev server |
+| `@vitejs/plugin-react` | React plugin for Vite |
 | `pandas` | Data manipulation (optional) |
 
 ## ⚙️ Configuration Options
@@ -196,6 +246,7 @@ Solution: pip install -r requirements.txt
 - Ensure stable internet connection for YouTube downloads
 - Consider using `tiny` Whisper model for faster transcription
 - Close other applications to free up system resources
+- Both frontend and backend support hot-reloading during development
 
 ## 🤝 Contributing
 
@@ -214,7 +265,9 @@ This project is open source and available under the [MIT License](LICENSE).
 - [OpenAI Whisper](https://github.com/openai/whisper) for speech recognition
 - [Google Gemini](https://ai.google.dev/) for AI summarization
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) for YouTube downloading
-- [Streamlit](https://streamlit.io/) for the web interface
+- [FastAPI](https://fastapi.tiangolo.com/) for the backend API framework
+- [React](https://reactjs.org/) for the frontend framework
+- [Vite](https://vitejs.dev/) for the build tool and development server
 
 ## 📞 Support
 
