@@ -124,7 +124,7 @@ body {
   cursor: not-allowed;
 }
 
-.settings-btn, .process-btn {
+.process-btn {
   padding: 1rem 1.5rem;
   border: none;
   border-radius: 12px;
@@ -135,17 +135,6 @@ body {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-}
-
-.settings-btn {
-  background: #f8f9fa;
-  color: #666;
-  min-width: auto;
-}
-
-.settings-btn:hover {
-  background: #e9ecef;
-  color: #333;
 }
 
 .process-btn {
@@ -164,68 +153,6 @@ body {
   opacity: 0.6;
   cursor: not-allowed;
   transform: none;
-}
-
-/* Settings Panel */
-.settings-panel {
-  background: #f8f9fa;
-  border-radius: 12px;
-  padding: 1.5rem;
-  margin-top: 1rem;
-}
-
-.setting-item {
-  margin-bottom: 1rem;
-}
-
-.setting-item:last-child {
-  margin-bottom: 0;
-}
-
-.setting-item label {
-  display: block;
-  margin-bottom: 0.5rem;
-  font-weight: 500;
-  color: #333;
-}
-
-.password-input {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.api-key-input {
-  flex: 1;
-  padding: 0.75rem 3rem 0.75rem 1rem;
-  border: 1px solid #e1e5e9;
-  border-radius: 8px;
-  font-size: 0.9rem;
-}
-
-.toggle-visibility {
-  position: absolute;
-  right: 0.75rem;
-  background: none;
-  border: none;
-  color: #666;
-  cursor: pointer;
-  padding: 0.25rem;
-}
-
-.help-text {
-  color: #666;
-  font-size: 0.85rem;
-  margin-top: 0.5rem;
-}
-
-.help-text a {
-  color: #667eea;
-  text-decoration: none;
-}
-
-.help-text a:hover {
-  text-decoration: underline;
 }
 
 /* Error Message */

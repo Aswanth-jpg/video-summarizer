@@ -1,16 +1,13 @@
 import React, { useState } from 'react';
-import { FaPlay, FaDownload, FaCog, FaEye, FaEyeSlash } from 'react-icons/fa';
+import { FaPlay, FaDownload } from 'react-icons/fa';
 import LoadingSpinner from './LoadingSpinner';
 import ResultsDisplay from './ResultsDisplay';
 
 const VideoProcessor = () => {
   const [url, setUrl] = useState('');
-  const [geminiKey, setGeminiKey] = useState('');
-  const [showApiKey, setShowApiKey] = useState(false);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
   const [error, setError] = useState('');
-  const [showSettings, setShowSettings] = useState(false);
 
   const isValidYouTubeUrl = (url) => {
     const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+/;
@@ -41,8 +38,7 @@ const VideoProcessor = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          url: url,
-          gemini_api_key: geminiKey || undefined
+          url: url
         }),
       });
 
@@ -101,14 +97,6 @@ const VideoProcessor = () => {
               disabled={loading}
             />
             <button
-              type="button"
-              onClick={() => setShowSettings(!showSettings)}
-              className="settings-btn"
-              title="API Settings"
-            >
-              <FaCog />
-            </button>
-            <button
               type="submit"
               disabled={loading || !url.trim()}
               className="process-btn"
@@ -117,37 +105,6 @@ const VideoProcessor = () => {
               {loading ? 'Processing...' : 'Summarize'}
             </button>
           </div>
-
-          {showSettings && (
-            <div className="settings-panel">
-              <div className="setting-item">
-                <label htmlFor="gemini-key">Gemini API Key (Optional)</label>
-                <div className="password-input">
-                  <input
-                    id="gemini-key"
-                    type={showApiKey ? 'text' : 'password'}
-                    value={geminiKey}
-                    onChange={(e) => setGeminiKey(e.target.value)}
-                    placeholder="Enter your Gemini API key..."
-                    className="api-key-input"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowApiKey(!showApiKey)}
-                    className="toggle-visibility"
-                  >
-                    {showApiKey ? <FaEyeSlash /> : <FaEye />}
-                  </button>
-                </div>
-                <small className="help-text">
-                  Get your API key from{' '}
-                  <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">
-                    Google AI Studio
-                  </a>
-                </small>
-              </div>
-            </div>
-          )}
         </form>
 
         {error && (
