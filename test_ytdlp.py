@@ -8,8 +8,10 @@ import tempfile
 
 def test_yt_dlp():
     """Test downloading a short YouTube video audio"""
+    print(f"Using yt-dlp version: {yt_dlp.version.__version__}")
+    
     # Use a short, popular video for testing
-    test_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"  # Rick Roll - short and reliable
+    test_url = "https://youtu.be/gG7uCskUOrA?si=RBV-cF2z_BJmshYT"  # Rick Roll - short and reliable
     
     temp_dir = tempfile.mkdtemp()
     print(f"Testing download to: {temp_dir}")
@@ -50,8 +52,17 @@ def test_yt_dlp():
                 print("❌ No audio file found")
                 return False
                 
+    except yt_dlp.utils.DownloadError as e:
+        print(f"❌ DownloadError: {e}")
+        print("\nThis can happen for several reasons:")
+        print("- The video might be region-restricted, age-restricted, or private.")
+        print("- YouTube may have updated its protection mechanisms.")
+        print("- Your version of yt-dlp might be outdated.")
+        print("\nI have attempted to upgrade it, but if the problem persists, you can try updating it manually:")
+        print("pip install --upgrade yt-dlp")
+        return False
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"❌ An unexpected error occurred: {e}")
         return False
     
     finally:

@@ -96,47 +96,88 @@ model = load_model()
 
 # --- Helper: Download YouTube audio using yt-dlp ---
 def download_audio(youtube_url: str) -> str:
-    """Download audio from YouTube using yt-dlp"""
+    """Download audio from YouTube using yt-dlp with robust error handling"""
     temp_dir = tempfile.mkdtemp()
     
-    ydl_opts = {
-        'format': 'bestaudio[ext=m4a]/bestaudio[ext=mp3]/bestaudio',
-        'outtmpl': os.path.join(temp_dir, '%(title)s.%(ext)s'),
-        'quiet': True,
-        'no_warnings': True,
-        'extractaudio': False,
-        'writethumbnail': False,
-        'writeinfojson': False,
-    }
+    # Multiple strategies to handle different YouTube protection schemes
+    strategies = [
+        # Strategy 1: Standard audio (works best for most videos)
+        {
+            'format': 'bestaudio/best',
+            'extractaudio': False,
+            'writethumbnail': False,
+            'writeinfojson': False,
+        },
+        # Strategy 2: Specific audio formats
+        {
+            'format': 'bestaudio[ext=m4a]/bestaudio[ext=mp3]/bestaudio',
+            'extractaudio': False,
+            'writethumbnail': False,
+            'writeinfojson': False,
+        },
+        # Strategy 3: Extract audio from low-quality video
+        {
+            'format': 'best[height<=480]',
+            'extractaudio': True,
+            'audioformat': 'mp3',
+            'writethumbnail': False,
+            'writeinfojson': False,
+        },
+        # Strategy 4: Any video format for audio extraction
+        {
+            'format': 'worst',
+            'extractaudio': True,
+            'audioformat': 'mp3',
+            'writethumbnail': False,
+            'writeinfojson': False,
+        }
+    ]
     
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(youtube_url, download=False)
-            if not info:
-                raise RuntimeError("Could not extract video information")
-                
-            duration = info.get('duration', 0)
-            if duration and duration > 3600:
-                st.warning(f"Video is {duration//60} minutes long. This may take a while to process.")
-            
-            ydl.download([youtube_url])
-            
-            files = os.listdir(temp_dir)
-            audio_files = [f for f in files if f.endswith(('.mp3', '.m4a', '.webm', '.opus', '.aac', '.ogg'))]
-            
-            if audio_files:
-                downloaded_file = os.path.join(temp_dir, audio_files[0])
-                if os.path.exists(downloaded_file) and os.path.getsize(downloaded_file) > 0:
-                    return downloaded_file
+    for i, strategy in enumerate(strategies):
+        ydl_opts = {
+            'outtmpl': os.path.join(temp_dir, '%(title)s.%(ext)s'),
+            'quiet': True,
+            'no_warnings': True,
+            'ignoreerrors': False,
+            'extract_flat': False,
+            # Add more options to handle YouTube's protection
+            'extractor_args': {
+                'youtube': {
+                    'skip': ['translated_subs'],
+                    'player_skip': ['webpage'],
+                }
+            },
+            **strategy
+        }
+    
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(youtube_url, download=False)
+                if not info:
+                    continue
                     
-            raise RuntimeError("Audio file download failed or file is empty.")
-            
-    except yt_dlp.DownloadError as e:
-        shutil.rmtree(temp_dir, ignore_errors=True)
-        raise RuntimeError(f"YouTube download failed: {str(e)}")
-    except Exception as e:
-        shutil.rmtree(temp_dir, ignore_errors=True)
-        raise RuntimeError(f"Failed to download audio: {str(e)}")
+                duration = info.get('duration', 0)
+                if duration and duration > 3600:
+                    st.warning(f"Video is {duration//60} minutes long. This may take a while to process.")
+                
+                ydl.download([youtube_url])
+                
+                files = os.listdir(temp_dir)
+                audio_files = [f for f in files if f.endswith(('.mp3', '.m4a', '.webm', '.opus', '.aac', '.ogg', '.flac', '.wav'))]
+                
+                if audio_files:
+                    downloaded_file = os.path.join(temp_dir, audio_files[0])
+                    if os.path.exists(downloaded_file) and os.path.getsize(downloaded_file) > 0:
+                        return downloaded_file
+                        
+        except yt_dlp.DownloadError as e:
+            continue
+        except Exception as e:
+            continue
+    
+    # If all strategies failed
+    shutil.rmtree(temp_dir, ignore_errors=True)
+    raise RuntimeError("All download strategies failed. This video may be region-restricted, age-restricted, or have YouTube's new protection that prevents downloading.")
 
 def maybe_convert_to_wav(input_path: str) -> str:
     """Convert to wav if needed"""

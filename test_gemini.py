@@ -4,22 +4,41 @@ Test script to verify Google Gemini API functionality
 """
 import google.generativeai as genai
 import os
+from pathlib import Path
+
 
 def load_env_file():
-    """Load environment variables from .env file"""
-    env_path = os.path.join(os.path.dirname(__file__), '.env')
-    if os.path.exists(env_path):
-        with open(env_path, 'r') as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith('#') and '=' in line:
-                    key, value = line.split('=', 1)
-                    key = key.strip()
-                    value = value.strip().strip('"\'')
-                    os.environ[key] = value
+    """Load environment variables from .env file.
+
+    Checks current working directory first, then the script directory.
+    Handles UTF-8 with BOM files.
+    """
+    candidate_paths = [
+        Path.cwd() / '.env',
+        Path(__file__).resolve().parent / '.env',
+    ]
+
+    for env_path in candidate_paths:
+        if env_path.exists():
+            try:
+                with open(env_path, 'r', encoding='utf-8-sig') as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith('#') and '=' in line:
+                            key, value = line.split('=', 1)
+                            key = key.strip().lstrip('\ufeff')
+                            value = value.strip().strip("'\"")
+                            os.environ[key] = value
+            except Exception:
+                # Try next candidate on error
+                continue
+            # Stop after first successful load
+            break
+
 
 # Load environment variables from .env file
 load_env_file()
+
 
 def test_gemini_api():
     """Test Gemini API functionality"""
@@ -63,6 +82,7 @@ def test_gemini_api():
     except Exception as e:
         print(f"❌ Error testing Gemini API: {e}")
         return False
+
 
 if __name__ == "__main__":
     print("Testing Google Gemini API...")

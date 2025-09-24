@@ -19,14 +19,14 @@ if __name__ == "__main__":
     from main import app
     
     host = os.getenv("HOST", "0.0.0.0")
-    port = int(os.getenv("PORT", 8000))
+    port = int(os.getenv("PORT", 8001))  # Use port 8001 instead
     
     print(f"🚀 Starting YouTube Summarizer API server...")
     print(f"📍 Server will be available at: http://{host}:{port}")
     print(f"📚 API docs available at: http://{host}:{port}/docs")
     
     uvicorn.run(
-        "main:app",  # Use import string for reload to work properly
+        "main:app",  # Use main backend with local Faster Whisper
         host=host, 
         port=port,
         reload=True,  # Enable auto-reload for development
