@@ -148,7 +148,31 @@ def summarize_text(text: str, api_key: Optional[str] = None) -> str:
     print("🤖 Generating summary with Gemini...")
     try:
         genai.configure(api_key=effective_key)
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        
+        # Try multiple models in order of preference
+        models_to_try = [
+            "gemini-2.0-flash",
+            "gemini-2.5-flash", 
+            "gemini-flash-latest",
+            "gemini-2.0-flash-lite",
+            "gemini-2.5-flash-lite"
+        ]
+        
+        model = None
+        last_error = None
+        
+        for model_name in models_to_try:
+            try:
+                model = genai.GenerativeModel(model_name)
+                print(f"✅ Using model: {model_name}")
+                break
+            except Exception as e:
+                last_error = e
+                print(f"⚠️ Model {model_name} not available: {str(e)[:100]}")
+                continue
+        
+        if not model:
+            raise last_error or Exception("No available models found")
 
         prompt = f"""
         You are an expert assistant who creates concise, easy-to-read summaries of video transcripts.

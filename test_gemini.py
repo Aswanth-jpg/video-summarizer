@@ -57,17 +57,39 @@ def test_gemini_api():
         
         print("🔑 API key found, testing connection...")
         
-        # Initialize the model
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        # Try multiple models in order of preference
+        models_to_try = [
+            'gemini-2.0-flash',
+            'gemini-2.5-flash', 
+            'gemini-flash-latest',
+            'gemini-2.0-flash-lite',
+            'gemini-2.5-flash-lite'
+        ]
         
-        # Test with a simple prompt
-        response = model.generate_content(
-            "Say 'Gemini API is working!' in exactly those words.",
-            generation_config=genai.types.GenerationConfig(
-                max_output_tokens=20,
-                temperature=0,
-            )
-        )
+        last_error = None
+        for model_name in models_to_try:
+            try:
+                print(f"🔄 Trying model: {model_name}")
+                model = genai.GenerativeModel(model_name)
+                
+                # Test with a simple prompt
+                response = model.generate_content(
+                    "Say 'Gemini API is working!' in exactly those words.",
+                    generation_config=genai.types.GenerationConfig(
+                        max_output_tokens=20,
+                        temperature=0,
+                    )
+                )
+                break  # Success, exit the loop
+            except Exception as e:
+                last_error = e
+                print(f"⚠️ Model {model_name} failed: {str(e)[:100]}...")
+                if "429" in str(e) or "quota" in str(e).lower():
+                    print("⚠️ Quota exceeded - try again later or upgrade your plan")
+                continue
+        else:
+            # All models failed
+            raise last_error or Exception("All models failed")
         
         result = response.text.strip()
         print(f"✅ API Response: {result}")
