@@ -12,7 +12,9 @@ from pydantic import BaseModel, HttpUrl
 from dotenv import load_dotenv
 
 # Load environment variables
-load_dotenv()
+backend_dir = Path(__file__).resolve().parent
+load_dotenv(backend_dir / ".env")
+load_dotenv(backend_dir.parent / ".env")
 
 # Suppress unnecessary warnings from imported libraries
 warnings.filterwarnings(

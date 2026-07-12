@@ -16,7 +16,7 @@ load_dotenv()
 
 if __name__ == "__main__":
     import uvicorn
-    from main import app
+    from simple_main import app
     
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", 8001))  # Use port 8001 instead
@@ -26,7 +26,7 @@ if __name__ == "__main__":
     print(f"📚 API docs available at: http://{host}:{port}/docs")
     
     uvicorn.run(
-        "main:app",  # Use main backend with local Faster Whisper
+        "simple_main:app",  # Use simple backend with chunked summarization
         host=host, 
         port=port,
         reload=True,  # Enable auto-reload for development
