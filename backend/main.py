@@ -2,7 +2,7 @@ import os
 import warnings
 import tempfile
 import shutil
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -120,7 +120,7 @@ def download_audio(youtube_url: str) -> str:
         print(f"❌ Download failed: {e}")
         raise e # Re-raise the exception to be caught by the API endpoint
 
-def transcribe_audio(audio_file_path: str) -> (str, Dict[str, Any]):
+def transcribe_audio(audio_file_path: str) -> Tuple[str, Dict[str, Any]]:
     """Transcribe audio using the pre-loaded faster-whisper model."""
     if not whisper_model:
         raise RuntimeError("Whisper model is not loaded.")
