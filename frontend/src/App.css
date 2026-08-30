@@ -308,35 +308,6 @@ body {
   min-height: 200px;
 }
 
-.segments-list {
-  max-height: 400px;
-  overflow-y: auto;
-}
-
-.segment-item {
-  display: flex;
-  gap: 1rem;
-  padding: 0.75rem 0;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.segment-item:last-child {
-  border-bottom: none;
-}
-
-.segment-time {
-  min-width: 100px;
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
-  font-size: 0.85rem;
-  color: #666;
-  font-weight: 600;
-}
-
-.segment-text {
-  flex: 1;
-  color: #333;
-  line-height: 1.5;
-}
 
 /* Responsive Design */
 @media (max-width: 768px) {
@@ -378,14 +349,5 @@ body {
     flex-direction: column;
     gap: 1rem;
     align-items: flex-start;
-  }
-
-  .segment-item {
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-
-  .segment-time {
-    min-width: auto;
   }
 }

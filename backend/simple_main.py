@@ -1,186 +1,242 @@
 #!/usr/bin/env python3
-"""
-Simplified YouTube Video Summarizer API
-"""
-import os
-import tempfile
-import shutil
-from typing import Dict, List, Any, Optional
-from pathlib import Path
+"""YouTube video summarizer API.
 
+Pipeline:
+YouTube URL -> yt-dlp -> local faster-whisper -> Gemini
+"""
+
+import os
+import shutil
+import tempfile
+from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import Any, List, Optional
+
+import yt_dlp
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
 from pydantic import BaseModel, HttpUrl
-from dotenv import load_dotenv
-import yt_dlp
-import google.generativeai as genai
 
-try:
-    import openai
-except Exception:
-    openai = None
+from faster_whisper import WhisperModel
+from google import genai
+from google.genai import types
 
-try:
-    from faster_whisper import WhisperModel
-except Exception:
-    WhisperModel = None
 
-# Load environment variables
-backend_dir = Path(__file__).resolve().parent
-load_dotenv(backend_dir / ".env")
-load_dotenv(backend_dir.parent / ".env")
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
 
-# Initialize FastAPI app
-app = FastAPI(title="YouTube Video Summarizer API", version="1.0.0")
+BACKEND_DIR = Path(__file__).resolve().parent
+load_dotenv(BACKEND_DIR.parent / ".env")
 
-# Add CORS middleware
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
+
+WHISPER_MODEL_NAME = os.getenv("WHISPER_MODEL", "base")
+WHISPER_DEVICE = os.getenv("WHISPER_DEVICE", "cpu")
+WHISPER_COMPUTE_TYPE = os.getenv("WHISPER_COMPUTE_TYPE", "int8")
+
+whisper_model: WhisperModel | None = None
+
+
+# ---------------------------------------------------------------------------
+# Models
+# ---------------------------------------------------------------------------
+
+class YouTubeRequest(BaseModel):
+    url: HttpUrl
+
+
+class TranscriptResponse(BaseModel):
+    transcript: str
+    summary: str
+    metadata: dict[str, Any]
+
+
+# ---------------------------------------------------------------------------
+# FFmpeg
+# ---------------------------------------------------------------------------
+
+def setup_ffmpeg() -> None:
+    """Find FFmpeg and add its directory to PATH if necessary."""
+    if shutil.which("ffmpeg"):
+        print("FFmpeg is already available in PATH.")
+        return
+
+    local_app_data = os.getenv("LOCALAPPDATA")
+    candidates: list[Path] = []
+
+    if local_app_data:
+        winget_dir = (
+            Path(local_app_data)
+            / "Microsoft"
+            / "WinGet"
+            / "Packages"
+        )
+        if winget_dir.exists():
+            candidates.extend(winget_dir.glob("**/bin/ffmpeg.exe"))
+
+    project_root = BACKEND_DIR.parent
+    candidates.extend(
+        [
+            project_root / "ffmpeg" / "bin" / "ffmpeg.exe",
+            project_root / "ffmpeg" / "ffmpeg.exe",
+        ]
+    )
+
+    ffmpeg_exe = next((path for path in candidates if path.is_file()), None)
+
+    if ffmpeg_exe:
+        os.environ["PATH"] = (
+            str(ffmpeg_exe.parent)
+            + os.pathsep
+            + os.environ.get("PATH", "")
+        )
+        print(f"Found FFmpeg at {ffmpeg_exe}")
+    else:
+        print("Warning: FFmpeg was not found.")
+
+
+# ---------------------------------------------------------------------------
+# Application startup
+# ---------------------------------------------------------------------------
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global whisper_model
+
+    setup_ffmpeg()
+
+    if not GEMINI_API_KEY:
+        print("Warning: GEMINI_API_KEY is not configured.")
+
+    try:
+        whisper_model = WhisperModel(
+            WHISPER_MODEL_NAME,
+            device=WHISPER_DEVICE,
+            compute_type=WHISPER_COMPUTE_TYPE,
+        )
+        print(
+            f"Loaded faster-whisper model: "
+            f"{WHISPER_MODEL_NAME} ({WHISPER_DEVICE}/{WHISPER_COMPUTE_TYPE})"
+        )
+    except Exception as exc:
+        whisper_model = None
+        print(f"Could not load faster-whisper: {exc}")
+
+    print("Backend server started!")
+    yield
+
+
+app = FastAPI(
+    title="YouTube Video Summarizer API",
+    version="2.0.0",
+    lifespan=lifespan,
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Global variables
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-whisper_model = None
 
-# Initialize API clients
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
+# ---------------------------------------------------------------------------
+# YouTube download
+# ---------------------------------------------------------------------------
 
-if OPENAI_API_KEY and openai:
-    openai.api_key = OPENAI_API_KEY
+def download_audio(youtube_url: str) -> tuple[str, str]:
+    """Download the best available YouTube audio stream."""
+    temp_dir = tempfile.mkdtemp(prefix="yt_summarizer_")
 
-def setup_ffmpeg():
-    """Ensure ffmpeg is available in the path"""
-    ffmpeg_dir = Path(__file__).parent.parent / "ffmpeg"
-    ffmpeg_exe = ffmpeg_dir / "ffmpeg.exe"
-
-    if ffmpeg_exe.exists():
-        print("Found ffmpeg.exe, adding to PATH.")
-        os.environ["PATH"] = str(ffmpeg_dir) + os.pathsep + os.environ["PATH"]
-    else:
-        print("ffmpeg.exe not found in the ffmpeg directory.")
-        # Check if it's in the system path already
-        if not shutil.which("ffmpeg"):
-            print("⚠️ ffmpeg is not in the system PATH. Audio conversion may fail.")
-
-# Pydantic models
-class YouTubeRequest(BaseModel):
-    url: HttpUrl
-    gemini_api_key: Optional[str] = None
-
-class ProcessingResponse(BaseModel):
-    message: str
-    status: str
-
-class TranscriptResponse(BaseModel):
-    transcript: str
-    summary: str
-    metadata: Dict[str, Any]
-
-# Load dependencies on startup
-@app.on_event("startup")
-async def startup_event():
-    """Setup dependencies on startup"""
-    global whisper_model
-    setup_ffmpeg()
-
-    # Gemini-only mode: use local faster-whisper for transcription if no OpenAI key.
-    if not OPENAI_API_KEY:
-        if WhisperModel is not None:
-            try:
-                whisper_model = WhisperModel("base", device="cpu", compute_type="int8")
-                print("Loaded local faster-whisper model (base).")
-            except Exception as e:
-                whisper_model = None
-                print(f"Could not load local faster-whisper model: {e}")
-        else:
-            print("faster-whisper is not installed; transcription requires OPENAI_API_KEY.")
-
-    print("Simple backend server started!")
-
-def download_audio(youtube_url: str) -> str:
-    """Download audio from YouTube using yt-dlp"""
-    temp_dir = tempfile.mkdtemp()
-    
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'outtmpl': os.path.join(temp_dir, '%(title)s.%(ext)s'),
-        'quiet': True,
-        'no_warnings': True,
+    options = {
+        "format": "bestaudio/best",
+        "outtmpl": str(Path(temp_dir) / "%(title)s.%(ext)s"),
+        "noplaylist": True,
+        "quiet": False,
+        "no_warnings": False,
     }
-    
+
     try:
         print(f"Downloading audio from: {youtube_url}")
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(youtube_url, download=False)
-            if not info:
-                raise RuntimeError("Could not extract video info")
-                
-            ydl.download([youtube_url])
-            
-            files = os.listdir(temp_dir)
-            audio_files = [f for f in files if f.endswith(('.mp3', '.m4a', '.webm', '.opus', '.aac'))]
-            
-            if audio_files:
-                downloaded_file = os.path.join(temp_dir, audio_files[0])
-                if os.path.exists(downloaded_file) and os.path.getsize(downloaded_file) > 0:
-                    print(f"Successfully downloaded: {downloaded_file}")
-                    return downloaded_file
-                    
-        raise RuntimeError("No valid audio file downloaded")
-                        
-    except Exception as e:
+
+        with yt_dlp.YoutubeDL(options) as ydl:
+            info = ydl.extract_info(youtube_url, download=True)
+
+        if not info:
+            raise RuntimeError("yt-dlp could not extract video information.")
+
+        audio_files = [
+            path
+            for path in Path(temp_dir).iterdir()
+            if path.is_file()
+            and path.suffix.lower() in {".m4a", ".webm", ".opus", ".mp3", ".aac"}
+            and path.stat().st_size > 0
+        ]
+
+        if not audio_files:
+            raise RuntimeError("yt-dlp did not produce an audio file.")
+
+        audio_path = audio_files[0]
+        print(f"Successfully downloaded: {audio_path}")
+
+        title = info.get("title") or "YouTube video"
+        return str(audio_path), title
+
+    except Exception:
         shutil.rmtree(temp_dir, ignore_errors=True)
-        raise RuntimeError(f"Download failed: {str(e)}")
+        raise
 
-def transcribe_audio(audio_file: str):
-    """Transcribe audio using OpenAI Whisper API or local faster-whisper fallback."""
-    if OPENAI_API_KEY and openai:
-        try:
-            client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
-            with open(audio_file, "rb") as audio:
-                transcript = client.audio.transcriptions.create(
-                    model="whisper-1",
-                    file=audio,
-                    response_format="text"
-                )
+# ---------------------------------------------------------------------------
+# Transcription
+# ---------------------------------------------------------------------------
 
-            file_size = os.path.getsize(audio_file)
-            estimated_duration = file_size / (32 * 1024)
+def transcribe_audio(audio_file: str) -> tuple[str, dict[str, Any]]:
+    """Transcribe downloaded audio using local faster-whisper."""
+    if whisper_model is None:
+        raise RuntimeError(
+            "faster-whisper is not available. "
+            "Check the backend startup log."
+        )
 
-            return transcript, {
-                "language": "auto-detected",
-                "language_probability": 0.95,
-                "duration": estimated_duration,
-            }
+    print("Transcribing audio with faster-whisper...")
 
-        except Exception as e:
-            print(f"OpenAI transcription error: {e}")
+    segments, info = whisper_model.transcribe(
+        audio_file,
+        vad_filter=True,
+    )
 
-    if whisper_model is not None:
-        try:
-            segments, info = whisper_model.transcribe(audio_file)
-            transcript = " ".join(seg.text for seg in segments).strip()
-            return transcript, {
-                "language": info.language,
-                "language_probability": info.language_probability,
-                "duration": info.duration,
-            }
-        except Exception as e:
-            print(f"Local transcription error: {e}")
+    transcript = " ".join(
+        segment.text.strip()
+        for segment in segments
+        if segment.text.strip()
+    ).strip()
 
-    return "⚠️ No transcription engine available. Install faster-whisper or set OPENAI_API_KEY.", {
-        "language": "unknown",
-        "language_probability": 0.0,
-        "duration": 0,
+    if not transcript:
+        raise RuntimeError("Whisper returned an empty transcript.")
+
+    metadata = {
+        "language": info.language,
+        "language_probability": info.language_probability,
+        "duration": info.duration,
     }
+
+    print("Transcription completed.")
+    return transcript, metadata
+
+
+# ---------------------------------------------------------------------------
+# Gemini summarization
+# ---------------------------------------------------------------------------
 
 def split_text_into_chunks(text: str, max_chars: int = 9000, overlap: int = 400) -> List[str]:
     """Split text into overlapping chunks to keep context while avoiding model limits."""
@@ -201,34 +257,32 @@ def split_text_into_chunks(text: str, max_chars: int = 9000, overlap: int = 400)
 
 def generate_with_gemini(
     prompt: str,
-    models_to_try: List[str],
+    model_name: str = "gemini-3.6-flash",
     max_output_tokens: int = 500,
     temperature: float = 0.5,
+    api_key: Optional[str] = None,
 ) -> tuple[Optional[str], Optional[Exception]]:
-    """Try prompt generation across multiple Gemini models and return first success."""
-    last_error = None
-    for model_name in models_to_try:
-        try:
-            print(f"Trying Gemini model: {model_name}")
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
-                    max_output_tokens=max_output_tokens,
-                    temperature=temperature,
-                )
-            )
-            if response and getattr(response, "text", None):
-                result_text = response.text.strip()
-                if result_text:
-                    return result_text, None
-            last_error = Exception("Gemini returned an empty response")
-        except Exception as e:
-            last_error = e
-            print(f"Gemini model failed: {model_name} -> {e}")
-            continue
+    """Generate content using Gemini."""
+    client = genai.Client(api_key=api_key or GEMINI_API_KEY)
 
-    return None, last_error
+    try:
+        print(f"Using Gemini model: {model_name}")
+        response = client.models.generate_content(
+            model=model_name,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                max_output_tokens=max_output_tokens,
+                temperature=temperature,
+            ),
+        )
+        if response and getattr(response, "text", None):
+            result_text = response.text.strip()
+            if result_text:
+                return result_text, None
+        return None, Exception("Gemini returned an empty response")
+    except Exception as e:
+        print(f"Gemini model failed: {model_name} -> {e}")
+        return None, e
 
 def _is_valid_chunk_summary(summary: str, chunk_index: int) -> bool:
     """Check if a chunk summary contains meaningful content (not just prompt echoes)."""
@@ -252,25 +306,13 @@ def summarize_text(text: str, api_key: Optional[str] = None) -> str:
     """Summarize text using Google Gemini"""
     if not text.strip():
         return "⚠️ No transcript text available to summarize."
-    
+
     # Use provided API key or fallback to environment variable
     effective_key = api_key or GEMINI_API_KEY
     if not effective_key:
         return "⚠️ Gemini API key not configured for summarization. Please add GEMINI_API_KEY to your environment variables or provide it in the request."
-    
+
     try:
-        # Configure with the provided API key.
-        genai.configure(api_key=effective_key)
-
-        # Try multiple current Gemini model names and attempt generation on each.
-        models_to_try = [
-            "gemini-2.0-flash",
-            "gemini-2.5-flash",
-            "gemini-2.0-flash-lite",
-            "gemini-2.5-flash-lite",
-            "gemini-flash-latest",
-        ]
-
         chunks = split_text_into_chunks(text)
         print(f"📊 Transcript split into {len(chunks)} chunk(s), total length: {len(text)} chars")
         partial_summaries: List[str] = []
@@ -291,9 +333,9 @@ Transcript:
 Summary:"""
             direct_summary, direct_error = generate_with_gemini(
                 prompt=direct_prompt,
-                models_to_try=models_to_try,
                 max_output_tokens=1200,
                 temperature=0.4,
+                api_key=effective_key,
             )
             if direct_summary:
                 return direct_summary
@@ -325,9 +367,9 @@ Summary of this section:"""
             for attempt in range(MAX_RETRIES):
                 chunk_summary, chunk_error = generate_with_gemini(
                     prompt=chunk_prompt,
-                    models_to_try=models_to_try,
                     max_output_tokens=800,
                     temperature=0.4,
+                    api_key=effective_key,
                 )
 
                 if chunk_summary and _is_valid_chunk_summary(chunk_summary, index):
@@ -366,9 +408,9 @@ Final summary:"""
 
         final_summary, final_error = generate_with_gemini(
             prompt=merge_prompt,
-            models_to_try=models_to_try,
             max_output_tokens=1200,
             temperature=0.4,
+            api_key=effective_key,
         )
 
         if final_summary:
@@ -386,54 +428,65 @@ Final summary:"""
     except Exception as e:
         return f"⚠️ Error generating summary with Gemini: {str(e)}"
 
-# API Routes
-@app.get("/")
-async def root():
-    return {"message": "YouTube Video Summarizer API (Simple Mode)", "status": "running"}
 
-@app.get("/health")
-async def health_check():
+# ---------------------------------------------------------------------------
+# API routes
+# ---------------------------------------------------------------------------
+
+@app.get("/")
+def root():
     return {
-        "status": "healthy",
-        "mode": "simple",
-        "gemini_api_configured": GEMINI_API_KEY is not None
+        "message": "YouTube Video Summarizer API",
+        "status": "running",
     }
 
+
+@app.get("/health")
+def health():
+    return {
+        "status": "healthy",
+        "whisper_loaded": whisper_model is not None,
+        "gemini_configured": bool(GEMINI_API_KEY),
+        "gemini_model": GEMINI_MODEL,
+    }
+
+
 @app.post("/process", response_model=TranscriptResponse)
-async def process_youtube_video(request: YouTubeRequest):
-    """Process a YouTube video: download, transcribe, and summarize"""
+def process_youtube_video(request: YouTubeRequest):
+    """Download, transcribe, summarize, and clean up a YouTube video."""
+    audio_path: str | None = None
+
     try:
-        # Download audio
-        audio_path = download_audio(str(request.url))
-        
-        try:
-            # Transcribe audio
-            transcript, meta = transcribe_audio(audio_path)
-            
-            # Summarize transcript
-            summary = summarize_text(transcript, request.gemini_api_key)
-            
-            # Clean up audio file
-            if audio_path and os.path.exists(audio_path):
-                temp_dir = os.path.dirname(audio_path)
-                shutil.rmtree(temp_dir, ignore_errors=True)
-            
-            return TranscriptResponse(
-                transcript=transcript,
-                summary=summary,
-                metadata=meta
-            )
-            
-        except Exception as e:
-            # Clean up on error
-            if audio_path and os.path.exists(audio_path):
-                temp_dir = os.path.dirname(audio_path)
-                shutil.rmtree(temp_dir, ignore_errors=True)
-            raise e
-            
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        audio_path, title = download_audio(str(request.url))
+        transcript, metadata = transcribe_audio(audio_path)
+        summary = summarize_text(transcript)
+
+        metadata["title"] = title
+        metadata["url"] = str(request.url)
+
+        return TranscriptResponse(
+            transcript=transcript,
+            summary=summary,
+            metadata=metadata,
+        )
+
+    except Exception as exc:
+        message = str(exc)
+        print(f"Processing failed: {message}")
+        raise HTTPException(status_code=500, detail=message) from exc
+
+    finally:
+        if audio_path:
+            temp_dir = Path(audio_path).parent
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+    uvicorn.run(
+        "simple_main:app",
+        host="0.0.0.0",
+        port=8001,
+        reload=True,
+    )

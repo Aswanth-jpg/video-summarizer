@@ -16,7 +16,7 @@ start "YouTube Summarizer Frontend" cmd /k "cd /d %~dp0 && cd frontend && npm ru
 echo.
 echo ========================================
 echo  Servers are starting...
-echo  Backend: http://localhost:8000
+echo  Backend: http://localhost:8001
 echo  Frontend: http://localhost:5173
 echo ========================================
 echo.

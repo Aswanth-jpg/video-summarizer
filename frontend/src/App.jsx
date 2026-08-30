@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import './App.css'
 import VideoProcessor from './components/VideoProcessor'
 import Header from './components/Header'

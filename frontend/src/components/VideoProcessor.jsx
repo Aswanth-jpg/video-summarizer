@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FaPlay, FaDownload } from 'react-icons/fa';
+import { FaPlay } from 'react-icons/fa';
 import LoadingSpinner from './LoadingSpinner';
 import ResultsDisplay from './ResultsDisplay';
 
@@ -43,8 +43,15 @@ const VideoProcessor = () => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to process video');
+        let message = 'Failed to process video';
+        try {
+          const errorData = await response.json();
+          message = errorData.detail || message;
+        } catch {
+          const text = await response.text();
+          message = text || message;
+        }
+        throw new Error(message.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, ''));
       }
 
       const data = await response.json();
@@ -56,31 +63,16 @@ const VideoProcessor = () => {
     }
   };
 
-  const downloadFile = async (content, filename, endpoint) => {
-    try {
-      const response = await fetch(`/api/download/${endpoint}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ [endpoint]: content }),
-      });
-
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.style.display = 'none';
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      }
-    } catch (err) {
-      console.error('Download failed:', err);
-    }
+  const downloadFile = (content, filename) => {
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
   };
 
   return (
@@ -128,10 +120,10 @@ const VideoProcessor = () => {
           <ResultsDisplay
             results={results}
             onDownloadTranscript={(transcript) => 
-              downloadFile(transcript, 'transcript.txt', 'transcript')
+              downloadFile(transcript, 'transcript.txt')
             }
             onDownloadSummary={(summary) => 
-              downloadFile(summary, 'summary.txt', 'summary')
+              downloadFile(summary, 'summary.txt')
             }
           />
         )}
