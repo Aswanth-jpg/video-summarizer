@@ -1,0 +1,55 @@
+name: video-summarizer
+
+services:
+
+  backend:
+    container_name: video-backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: video-summarizer-backend:1.0
+    env_file:
+      - ./backend/.env
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8001"
+    ports:
+      - "8001:8001"
+    networks:
+      - video-network
+    restart: unless-stopped
+
+  frontend:
+    container_name: video-frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: video-summarizer-frontend:1.0
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+    networks:
+      - video-network
+    restart: unless-stopped
+
+  portainer:
+    container_name: portainer
+    image: portainer/portainer-ce:latest
+    ports:
+      - "8000:8000"
+      - "9443:9443"
+    volumes:
+      - portainer_data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - video-network
+    restart: unless-stopped
+
+networks:
+  video-network:
+    external: true
+
+volumes:
+  portainer_data:
+    external: true
