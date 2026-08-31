@@ -114,4 +114,4 @@ streamlit.out
 # ----- Misc -----
 .gemini/
 .cache/
-*.bak
+*.bak.env

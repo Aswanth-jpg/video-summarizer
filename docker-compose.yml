@@ -9,7 +9,7 @@ services:
       dockerfile: Dockerfile
     image: video-summarizer-backend:1.0
     env_file:
-      - ./backend/.env
+      - ./.env
     environment:
       HOST: 0.0.0.0
       PORT: "8001"
