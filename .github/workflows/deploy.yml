@@ -14,8 +14,10 @@ jobs:
         run: |
           cd ~/projects/video-summarizer
 
-          echo "Pulling latest code..."
-          git pull origin main
+          echo "Fetching latest code..."
+          git fetch origin main
+          git reset --hard origin/main
+          git clean -fd
 
           echo "Rebuilding backend..."
           docker compose build backend
