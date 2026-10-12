@@ -44,13 +44,17 @@ const VideoProcessor = () => {
 
       if (!response.ok) {
         let message = 'Failed to process video';
-        try {
-          const errorData = await response.json();
-          message = errorData.detail || message;
-        } catch {
-          const text = await response.text();
-          message = text || message;
+        const rawText = await response.text();
+
+        if (rawText) {
+          try {
+            const errorData = JSON.parse(rawText);
+            message = errorData.detail || errorData.message || message;
+          } catch {
+            message = rawText;
+          }
         }
+
         throw new Error(message.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, ''));
       }
 
