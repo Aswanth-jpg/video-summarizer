@@ -32,7 +32,7 @@ BACKEND_DIR = Path(__file__).resolve().parent
 load_dotenv(BACKEND_DIR.parent / ".env")
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 WHISPER_MODEL_NAME = os.getenv("WHISPER_MODEL", "base")
 WHISPER_DEVICE = os.getenv("WHISPER_DEVICE", "cpu")
@@ -288,7 +288,25 @@ def generate_with_gemini(
             if result_text and result_text.strip():
                 return result_text.strip(), None
 
-            last_error = Exception("Gemini returned an empty response")
+            diagnostic_parts: list[str] = []
+            prompt_feedback = getattr(response, "prompt_feedback", None)
+            if prompt_feedback:
+                diagnostic_parts.append(f"prompt_feedback={prompt_feedback}")
+
+            candidates = getattr(response, "candidates", None) or []
+            for candidate in candidates:
+                finish_reason = getattr(candidate, "finish_reason", None)
+                if finish_reason:
+                    diagnostic_parts.append(f"finish_reason={finish_reason}")
+
+            diagnostic = (
+                "; ".join(diagnostic_parts)
+                if diagnostic_parts
+                else "no candidates or text were returned"
+            )
+            last_error = Exception(
+                f"Gemini returned an empty response ({diagnostic})"
+            )
 
         except Exception as error:
             last_error = error
