@@ -8,6 +8,7 @@ YouTube URL -> yt-dlp -> local faster-whisper -> Gemini
 import os
 import shutil
 import tempfile
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, List, Optional
@@ -257,32 +258,59 @@ def split_text_into_chunks(text: str, max_chars: int = 9000, overlap: int = 400)
 
 def generate_with_gemini(
     prompt: str,
-    model_name: str = "gemini-3.6-flash",
+    model_name: str = GEMINI_MODEL,
     max_output_tokens: int = 500,
     temperature: float = 0.5,
     api_key: Optional[str] = None,
 ) -> tuple[Optional[str], Optional[Exception]]:
-    """Generate content using Gemini."""
+    """Generate content using Gemini with retries for temporary failures."""
     client = genai.Client(api_key=api_key or GEMINI_API_KEY)
+    max_attempts = 3
+    last_error: Optional[Exception] = None
 
-    try:
-        print(f"Using Gemini model: {model_name}")
-        response = client.models.generate_content(
-            model=model_name,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                max_output_tokens=max_output_tokens,
-                temperature=temperature,
-            ),
-        )
-        if response and getattr(response, "text", None):
-            result_text = response.text.strip()
-            if result_text:
-                return result_text, None
-        return None, Exception("Gemini returned an empty response")
-    except Exception as e:
-        print(f"Gemini model failed: {model_name} -> {e}")
-        return None, e
+    for attempt in range(max_attempts):
+        try:
+            print(
+                f"Using Gemini model: {model_name} "
+                f"(attempt {attempt + 1}/{max_attempts})"
+            )
+
+            response = client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    max_output_tokens=max_output_tokens,
+                    temperature=temperature,
+                ),
+            )
+
+            result_text = getattr(response, "text", None)
+            if result_text and result_text.strip():
+                return result_text.strip(), None
+
+            last_error = Exception("Gemini returned an empty response")
+
+        except Exception as error:
+            last_error = error
+            error_text = str(error).upper()
+            is_temporary = any(
+                marker in error_text
+                for marker in ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED")
+            )
+
+            print(f"Gemini model failed: {model_name} -> {error}")
+
+            if not is_temporary:
+                return None, error
+
+        if attempt < max_attempts - 1:
+            delay = 2 ** (attempt + 1)
+            print(f"Retrying Gemini in {delay} seconds...")
+            time.sleep(delay)
+
+    return None, last_error or Exception(
+        "Gemini failed after all retry attempts"
+    )
 
 def _is_valid_chunk_summary(summary: str, chunk_index: int) -> bool:
     """Check if a chunk summary contains meaningful content (not just prompt echoes)."""
