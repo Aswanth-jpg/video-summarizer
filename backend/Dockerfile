@@ -17,6 +17,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
+# Always upgrade yt-dlp to latest — it updates frequently to keep up with YouTube
+RUN pip install --no-cache-dir --upgrade yt-dlp
+
 # Copy the application
 COPY . .
 
