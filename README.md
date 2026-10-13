@@ -77,6 +77,13 @@ brew install ffmpeg
 Create a `.env` file in the backend directory:
 ```env
 GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_MODEL=gemini-3.8-flash
+```
+
+If your Gemini account uses a different available model, you can override the
+primary model in the same `.env` file:
+```env
+GEMINI_MODEL=gemini-3.8-flash
 ```
 
 #### Option B: Runtime Input
@@ -205,7 +212,7 @@ curl http://localhost:8000/health
 ### Model Settings
 - **Whisper Model**: Currently uses `base` model (can be changed to `tiny`, `small`, `medium`, `large`)
 - **Compute Type**: Set to `int8` for CPU optimization
-- **Gemini Model**: Uses `gemini-1.5-flash` for fast responses
+- **Gemini Model**: Uses `gemini-3.8-flash` by default and automatically discovers other models supported by your API key when a temporary failure occurs; override with `GEMINI_MODEL`
 
 ### Audio Processing
 - **Automatic Format Detection**: Supports multiple audio formats

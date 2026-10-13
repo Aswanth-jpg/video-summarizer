@@ -32,7 +32,7 @@ BACKEND_DIR = Path(__file__).resolve().parent
 load_dotenv(BACKEND_DIR.parent / ".env")
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 
 WHISPER_MODEL_NAME = os.getenv("WHISPER_MODEL", "base")
 WHISPER_DEVICE = os.getenv("WHISPER_DEVICE", "cpu")
@@ -263,17 +263,14 @@ def generate_with_gemini(
     temperature: float = 0.5,
     api_key: Optional[str] = None,
 ) -> tuple[Optional[str], Optional[Exception]]:
-    """Generate content using Gemini with retries for temporary failures."""
+    """Generate content using the configured Gemini model with bounded retries."""
     client = genai.Client(api_key=api_key or GEMINI_API_KEY)
-    max_attempts = 3
     last_error: Optional[Exception] = None
+    max_attempts = 5
 
     for attempt in range(max_attempts):
         try:
-            print(
-                f"Using Gemini model: {model_name} "
-                f"(attempt {attempt + 1}/{max_attempts})"
-            )
+            print(f"Using Gemini model: {model_name} (attempt {attempt + 1}/{max_attempts})")
 
             response = client.models.generate_content(
                 model=model_name,
@@ -304,31 +301,25 @@ def generate_with_gemini(
                 if diagnostic_parts
                 else "no candidates or text were returned"
             )
-            last_error = Exception(
-                f"Gemini returned an empty response ({diagnostic})"
-            )
+            last_error = Exception(f"Gemini returned an empty response ({diagnostic})")
 
         except Exception as error:
             last_error = error
             error_text = str(error).upper()
-            is_temporary = any(
-                marker in error_text
-                for marker in ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED")
-            )
+            print(f"Gemini request failed (attempt {attempt + 1}/{max_attempts}): {error}")
 
-            print(f"Gemini model failed: {model_name} -> {error}")
-
-            if not is_temporary:
-                return None, error
+            # Don't retry on quota/auth errors — they won't resolve by retrying
+            if any(marker in error_text for marker in ("429", "RESOURCE_EXHAUSTED", "401", "403", "404")):
+                break
 
         if attempt < max_attempts - 1:
-            delay = 2 ** (attempt + 1)
-            print(f"Retrying Gemini in {delay} seconds...")
+            # 503 server overload needs a longer wait; other errors use shorter backoff
+            is_overloaded = "503" in str(last_error).upper() or "UNAVAILABLE" in str(last_error).upper()
+            delay = 5 * (2 ** attempt) if is_overloaded else 2 ** (attempt + 1)
+            print(f"Retrying in {delay} seconds...")
             time.sleep(delay)
 
-    return None, last_error or Exception(
-        "Gemini failed after all retry attempts"
-    )
+    return None, last_error or Exception("Gemini failed after all retry attempts")
 
 def _is_valid_chunk_summary(summary: str, chunk_index: int) -> bool:
     """Check if a chunk summary contains meaningful content (not just prompt echoes)."""
